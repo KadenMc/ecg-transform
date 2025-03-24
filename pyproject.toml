@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecg-transform"
+version = "0.1.0"
+authors = [
+  { name="Kaden McKeen", email="kaden.mckeen@mail.utoronto.ca" },
+]
+description = "Flexible, cohesive pipeline for ECG transformations and augmentations."
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+]
+keywords = ["ecg", "ekg", "electrocardiogram", "transform", "transformation", "transformations", "augment", "augmentation", "augmentations"]
+
+[project.urls]
+"Homepage" = "https://github.com/KadenMc/ecg-transform"
+"Bug Tracker" = "https://github.com/KadenMc/ecg-transform/issues"
