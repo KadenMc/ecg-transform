@@ -20,7 +20,7 @@ SAMPLE_RATE = 500
 N_SAMPLES = 5000
 
 SCHEMA = ECGInputSchema(
-    sampling_rate=SAMPLE_RATE,
+    sample_rate=SAMPLE_RATE,
     expected_lead_order=LEAD_ORDER,
     required_num_samples=N_SAMPLES,
 )
@@ -30,7 +30,7 @@ TRANSFORMS = [
         expected_order=LEAD_ORDER,
         missing_lead_strategy='raise',
     ),
-    LinearResample(desired_sampling_rate=SAMPLE_RATE),
+    LinearResample(desired_sample_rate=SAMPLE_RATE),
     MinMaxNormalize(),
     Segment(segment_length=N_SAMPLES),
     Pad(pad_to_num_samples=N_SAMPLES, value=0)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecg-transform"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
   { name="Kaden McKeen", email="kaden.mckeen@mail.utoronto.ca" },
 ]
@@ -18,8 +18,8 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
+    "numpy>=2.1.3",
+    "scipy>=1.14.0",
 ]
 keywords = ["ecg", "ekg", "electrocardiogram", "transform", "transformation", "transformations", "augment", "augmentation", "augmentations"]
 

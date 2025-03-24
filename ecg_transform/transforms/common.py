@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any, Union
+from typing import Any, Callable, List, Optional, Union
 from copy import deepcopy
 
 import numpy as np
@@ -175,10 +175,10 @@ class LinearResample(ECGTransform):
         metadata.sample_rate = self.desired_sample_rate
         metadata.num_samples = desired_num_samples
         metadata.input_start = int(
-            metadata.input_start * (desired_sample_rate/current_fs)
+            metadata.input_start * (self.desired_sample_rate/current_fs)
         )
         metadata.input_end = int(
-            metadata.input_end * (desired_sample_rate/current_fs)
+            metadata.input_end * (self.desired_sample_rate/current_fs)
         )
 
         return ECGInput(new_signal, metadata)
@@ -270,7 +270,7 @@ class LowpassFilter(ECGTransform):
         filtered_signal = np.array([filtfilt(b, a, lead) for lead in signal])
         return ECGInput(filtered_signal, metadata)
 
-class Segment(ECGTransform):
+class SegmentNonoverlapping(ECGTransform):
     def __init__(self, segment_length: int):
         self.segment_length = segment_length
 
@@ -286,6 +286,9 @@ class Segment(ECGTransform):
             segment_signal = signal[:, start:end]
             segment_metadata = deepcopy(metadata)
             segment_metadata.num_samples = self.segment_length
+            segment_metadata.input_start = start
+            segment_metadata.input_end = end
+
             segments.append(ECGInput(segment_signal, segment_metadata))
 
         return segments
@@ -316,7 +319,7 @@ class SegmentOnBoundaries(ECGTransform):
         signal = inp.signal  # Shape: (num_leads, num_samples)
         metadata = deepcopy(inp.meta)
         num_samples = signal.shape[1]
-
+        segments = []
         for boundary in boundaries:
             # Define segment start and end, ensuring they stay within signal bounds
             start = max(0, boundary - self.left_offset)
@@ -327,6 +330,8 @@ class SegmentOnBoundaries(ECGTransform):
                 segment_signal = signal[:, start:end]
                 segment_metadata = deepcopy(metadata)
                 segment_metadata.num_samples = end - start
+                segment_metadata.input_start = start
+                segment_metadata.input_end = end
                 segments.append(ECGInput(segment_signal, segment_metadata))
 
         return segments
