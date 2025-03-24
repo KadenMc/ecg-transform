@@ -8,7 +8,7 @@ version = "0.1.0"
 authors = [
   { name="Kaden McKeen", email="kaden.mckeen@mail.utoronto.ca" },
 ]
-description = "Flexible, cohesive pipeline for ECG transformations and augmentations."
+description = "Package curating cohesive training & inference pipelines for ECG analysis."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.7"
