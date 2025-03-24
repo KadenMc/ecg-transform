@@ -18,8 +18,8 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
+    "numpy>=2.1.3",
+    "scipy>=1.14.0",
 ]
 keywords = ["ecg", "ekg", "electrocardiogram", "transform", "transformation", "transformations", "augment", "augmentation", "augmentations"]
 
