@@ -6,13 +6,13 @@
 ## Example
 Here is an example of defining an input schema and transforms,
 ```
-from ecg_transform.input import ECGInputSchema
+from ecg_transform.inp import ECGInputSchema
 from ecg_transform.transforms.common import (
     LinearResample,
     MinMaxNormalize,
     Pad,
     ReorderLeads,
-    Segment,
+    SegmentNonoverlapping,
 )
 
 LEAD_ORDER = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
@@ -32,7 +32,7 @@ TRANSFORMS = [
     ),
     LinearResample(desired_sample_rate=SAMPLE_RATE),
     MinMaxNormalize(),
-    Segment(segment_length=N_SAMPLES),
+    SegmentNonoverlapping(segment_length=N_SAMPLES),
     Pad(pad_to_num_samples=N_SAMPLES, value=0)
 ]
 ```
