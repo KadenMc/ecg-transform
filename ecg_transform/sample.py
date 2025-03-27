@@ -5,7 +5,7 @@ from copy import deepcopy
 import numpy as np
 
 from ecg_transform.inp import ECGInput, ECGInputSchema, ECGMetadata
-from ecg_transform.transforms.common import ECGTransform
+from ecg_transform.t.common import ECGTransform
 from ecg_transform.utils.common import to_list
 
 class ECGSample:

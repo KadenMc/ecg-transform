@@ -6,18 +6,14 @@
 ## Example
 Here is an example of defining an input schema and transforms,
 ```
-from ecg_transform.input import ECGInputSchema
-from ecg_transform.transforms.common import (
-    LinearResample,
-    MinMaxNormalize,
-    Pad,
-    ReorderLeads,
-    Segment,
-)
+from ecg_transform.inp import ECGInputSchema
+from ecg_transform.t.common import LinearResample, ReorderLeads
+from ecg_transform.t.normalize import MinMaxNormalize
+from ecg_transform.t.cut import Pad, SegmentNonoverlapping
 
 LEAD_ORDER = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 SAMPLE_RATE = 500
-N_SAMPLES = 5000
+N_SAMPLES = SAMPLE_RATE*10
 
 SCHEMA = ECGInputSchema(
     sample_rate=SAMPLE_RATE,
@@ -32,7 +28,7 @@ TRANSFORMS = [
     ),
     LinearResample(desired_sample_rate=SAMPLE_RATE),
     MinMaxNormalize(),
-    Segment(segment_length=N_SAMPLES),
+    SegmentNonoverlapping(segment_length=N_SAMPLES),
     Pad(pad_to_num_samples=N_SAMPLES, value=0)
 ]
 ```
@@ -51,7 +47,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 
 from ecg_transform.inp import ECGInput, ECGInputSchema
-from ecg_transform.transforms.base import ECGTransform
+from ecg_transform.t.base import ECGTransform
 from ecg_transform.sample import ECGMetadata, ECGSample
 
 class ECGDataset(Dataset):
