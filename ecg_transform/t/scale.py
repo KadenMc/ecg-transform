@@ -7,117 +7,75 @@ from ecg_transform.inp import ECGInput
 from ecg_transform.t.base import ECGTransform
 
 class Standardize(ECGTransform):
+    """
+    Subtract per-lead mean and divide by per-lead standard deviation.
+    """
     def __init__(self, constant_lead_strategy: str = 'zero'):
         self.constant_lead_strategy = constant_lead_strategy
 
     def _transform(self, inp: ECGInput) -> ECGInput:
-        signal = inp.signal
-        metadata = deepcopy(inp.meta)
+        """
+        Apply zero-mean and unit-variance scaling, then handle any constant leads.
+        """
+        signal: np.ndarray = inp.signal
+        meta = deepcopy(inp.meta)
+
+        # subtract per-lead mean
         mean = np.mean(signal, axis=1, keepdims=True)
-        signal = signal - mean
-        std = np.std(signal, axis=1, keepdims=True)
-        constant = std == 0
-        if not constant.any() or self.constant_lead_strategy == 'nan':
-            signal = signal / std
-        else:
-            std_replaced = np.where(constant, 1, std)
-            signal = signal / std_replaced
-            if self.constant_lead_strategy == 'zero':
-                signal[constant] = 0
-            elif self.constant_lead_strategy == 'keep':
-                pass
-            else:
-                raise ValueError(
-                    f"Unknown constant_lead_strategy: {self.constant_lead_strategy}"
-                )
+        centered = signal - mean
 
-        metadata.unit = 'standardized'
+        # divide by per-lead std, adding a small epsilon to avoid division by zero
+        std = np.std(centered, axis=1, keepdims=True)
+        scaled = centered / (std + 1e-8)
 
-        return ECGInput(signal, metadata)
+        meta.unit = 'standardized'
+        return ECGInput(scaled, meta)
 
 class MinMaxNormalize(ECGTransform):
+    """
+    Shift each lead to zero and scale to the [0, 1] range.
+    """
     def __init__(self, constant_lead_strategy: str = 'zero'):
         self.constant_lead_strategy = constant_lead_strategy
 
     def _transform(self, inp: ECGInput) -> ECGInput:
-        signal = inp.signal
-        metadata = deepcopy(inp.meta)
+        """
+        Apply min-max normalization, then handle any constant leads.
+        """
+        signal: np.ndarray = inp.signal
+        meta = deepcopy(inp.meta)
 
-        signal_min = np.min(signal, axis=1, keepdims=True)
-        signal_max = np.max(signal, axis=1, keepdims=True)
-        constant = (signal_min == signal_max).squeeze()
+        # compute per-lead min and max
+        mn = np.min(signal, axis=1, keepdims=True)
+        mx = np.max(signal, axis=1, keepdims=True)
 
-        if not constant.any() or self.constant_lead_strategy == 'nan':
-            signal = (signal - signal_min)/(signal_max - signal_min)
-        else:
-            signal = (signal - signal_min)/(signal_max - signal_min + 1e-8)
-            if self.constant_lead_strategy == 'zero':
-                signal[constant] = 0
-            elif self.constant_lead_strategy == 'keep':
-                pass
-            else:
-                raise ValueError(
-                    f"Unknown constant_lead_strategy: {self.constant_lead_strategy}"
-                )
+        # shift and scale, adding epsilon to avoid division by zero
+        scaled = (signal - mn) / ((mx - mn) + 1e-8)
 
-        metadata.unit = 'min_max_normalized'
-
-        return ECGInput(signal, metadata)
+        meta.unit = 'min_max_normalized'
+        return ECGInput(scaled, meta)
 
 class IQRNormalize(ECGTransform):
     """
-    A transform class that normalizes ECG signals using the Interquartile Range (IQR).
-    This is typically used as a form of outlier removal.
-
-    Args:
-        constant_lead_strategy (str): Strategy for handling leads with zero IQR.
-            Options are 'zero' (set to zero) or 'keep' (retain normalized values).
-            Default is 'zero'.
+    Normalize each lead by its interquartile range (IQR).
     """
     def __init__(self, constant_lead_strategy: str = 'zero'):
         self.constant_lead_strategy = constant_lead_strategy
 
     def _transform(self, inp: ECGInput) -> ECGInput:
         """
-        Applies IQR normalization to the ECG signal.
-        
-        Args:
-            inp (ECGInput): Input ECG object with signal and metadata.
-        
-        Returns:
-            ECGInput: New ECGInput object with normalized signal and updated metadata.
+        Apply IQR normalization, then handle any constant leads.
         """
-        # Extract the signal (shape: num_leads, signal_length)
-        signal = inp.signal
+        signal: np.ndarray = inp.signal
+        meta = deepcopy(inp.meta)
 
-        # Create a deep copy of metadata to avoid modifying the original
-        metadata = deepcopy(inp.meta)
-
-        # Compute 25th and 75th percentiles for each lead
+        # compute first and third quartiles
         Q1 = np.percentile(signal, 25, axis=1, keepdims=True)
         Q3 = np.percentile(signal, 75, axis=1, keepdims=True)
-
-        # Calculate IQR per lead
         IQR = Q3 - Q1
 
-        # Small constant to prevent division by zero
-        epsilon = 1e-8
+        # shift by Q1 and scale by IQR, adding epsilon to avoid division by zero
+        scaled = (signal - Q1) / (IQR + 1e-8)
 
-        # Normalize the signal: (signal - Q1) / (IQR + epsilon)
-        normalized_signal = (signal - Q1) / (IQR + epsilon)
-
-        # Handle constant leads (where IQR == 0)
-        if self.constant_lead_strategy == 'zero':
-            constant = (IQR == 0).squeeze()
-            if constant.any():
-                # Set normalized values to zero for constant leads
-                normalized_signal[constant] = 0
-        elif self.constant_lead_strategy != 'keep':
-            raise ValueError(f"Unknown constant_lead_strategy: {self.constant_lead_strategy}")
-        # If 'keep', retain the normalized values (which are zero for constant leads)
-
-        # Update metadata to indicate the signal is IQR normalized
-        metadata.unit = 'iqr_normalized'
-
-        # Return new ECGInput object with transformed signal
-        return ECGInput(normalized_signal, metadata)
+        meta.unit = 'iqr_normalized'
+        return ECGInput(scaled, meta)

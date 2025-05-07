@@ -100,3 +100,52 @@ class MissingLeadToConstant(ECGTransform):
             if lead in lead_to_idx:
                 signal[lead_to_idx[lead]] = self.value
         return ECGInput(signal, metadata)
+
+class HandleConstantLeads(ECGTransform):
+    """
+    Zero‐out or retain any lead whose values are constant across time.
+
+    Parameters
+    ----------
+    constant_lead_strategy : str, default 'zero'
+        How to handle constant leads:
+            - 'zero': Set all samples in constant leads to 0.
+            - 'ignore': Leave signal unchanged.
+            - 'nan': Set all samples in constant leads to NaN.
+    """
+
+    def __init__(self, strategy: str = 'zero'):
+        if not strategy in ['zero', 'ignore', 'nan']:
+            raise ValueError(f"Unknown constant lead strategy: {strategy}.")
+
+        self.strategy = strategy
+
+    def _transform(self, inp: ECGInput) -> ECGInput:
+        """
+        Inspect inp.signal (shape: n_leads × length), detect any lead
+        where every sample equals the first sample (i.e. constant), and
+        apply the chosen strategy.
+
+        Returns a new ECGInput with exactly the same metadata.
+        """
+        if self.strategy == 'ignore':
+            return inp
+
+        signal = inp.signal
+        meta = deepcopy(inp.meta)
+
+        # Create boolean mask of whether a specific lead is constant (all same values)
+        constant = (np.std(signal, axis=1) == 0).squeeze()
+
+        if not np.any(constant):
+            # If no constant leads, nothing to be done
+            return ECGInput(signal, meta)
+
+        if self.strategy == 'zero':
+            # Convert constant leads to zero
+            signal[constant, :] = 0
+        elif self.strategy == 'keep':
+            # Convert constant leads to NaN
+            signal[constant, :] = np.nan
+
+        return ECGInput(signal, meta)
