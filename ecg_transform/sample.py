@@ -63,4 +63,16 @@ class ECGSample:
 
     @property
     def out(self):
-        return np.stack([inp.signal for inp in self.input_processed])
+        processed = to_list(self.input_processed)
+        if not processed:
+            raise ValueError(
+                "No processed inputs to stack — the transform pipeline produced an "
+                "empty list (e.g. SegmentNonoverlapping with segment_length > signal length)."
+            )
+        shapes = {inp.signal.shape for inp in processed}
+        if len(shapes) > 1:
+            raise ValueError(
+                f"Cannot stack inputs of differing shapes: {sorted(shapes)}. Add a "
+                "Pad/Crop step (or fixed-length segmentation) to equalize lengths before .out."
+            )
+        return np.stack([inp.signal for inp in processed])

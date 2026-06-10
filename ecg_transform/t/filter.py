@@ -19,19 +19,20 @@ class LowpassFilter(ECGTransform):
         fs = metadata.sample_rate
         nyquist = 0.5 * fs
         normal_cutoff = self.cutoff_freq / nyquist
+        if not 0 < normal_cutoff < 1:
+            raise ValueError(
+                f"cutoff_freq ({self.cutoff_freq} Hz) must be in the open interval "
+                f"(0, Nyquist={nyquist} Hz) for a sample_rate of {fs} Hz."
+            )
         b, a = butter(self.order, normal_cutoff, btype='low', analog=False)
+        # filtfilt needs the signal longer than its default padlen, else it raises
+        # a cryptic error. Guard explicitly (common after segmentation).
+        padlen = 3 * max(len(a), len(b))
+        if signal.shape[1] <= padlen:
+            raise ValueError(
+                f"Signal length ({signal.shape[1]}) is too short for filtfilt with "
+                f"order={self.order} (needs > {padlen} samples). Lower the order or "
+                "filter before segmenting."
+            )
         filtered_signal = np.array([filtfilt(b, a, lead) for lead in signal])
         return ECGInput(filtered_signal, metadata)
-
-
-
-def butter_lowpass(cutoff, fs, order=4):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
-
-def lowpass_filter(data, cutoff, fs, order=4):
-    b, a = butter_lowpass(cutoff, fs, order=order)
-    y = filtfilt(b, a, data)
-    return y

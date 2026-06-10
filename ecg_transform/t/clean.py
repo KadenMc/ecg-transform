@@ -3,7 +3,8 @@ from copy import deepcopy
 
 import numpy as np
 
-from scipy.sparse import spdiags # Detrend
+from scipy.sparse import spdiags, eye  # Detrend
+from scipy.sparse.linalg import splu  # Detrend
 
 from ecg_transform.inp import ECGInput
 from ecg_transform.t.base import ECGTransform
@@ -28,23 +29,26 @@ class Detrend(ECGTransform):
         """
         signal = inp.signal  # Shape: (num_leads, signal_length)
         metadata = deepcopy(inp.meta)
-        signal_length = signal.shape[1]
+        N = signal.shape[1]
 
-        # Identity matrix
-        H = np.identity(signal_length)
-
-        # Second-order difference matrix
+        # Second-order difference operator D, shape (N-2, N), kept SPARSE.
         data = np.array([
-            np.ones(signal_length),
-            -2 * np.ones(signal_length),
-            np.ones(signal_length)
+            np.ones(N),
+            -2 * np.ones(N),
+            np.ones(N),
         ])
-        D = spdiags(data, [0, 1, 2], signal_length - 2, signal_length).toarray()
+        D = spdiags(data, [0, 1, 2], N - 2, N)
 
-        # Transformation matrix
-        M = H - np.linalg.inv(H + (self.smoothing_factor ** 2) * (D.T @ D))
-
-        # Detrend all leads
-        detrended_signal = (M @ signal.T).T  # Shape: (num_leads, signal_length)
+        # Smoothness-priors detrending (Tarvainen et al. 2002):
+        #     z_stat = (I - (I + λ²DᵀD)^-1) y
+        # Solve (I + λ²DᵀD) x = y for every lead with a sparse LU rather than
+        # forming a dense N×N inverse (np.linalg.inv on an N×N matrix is ~N²
+        # memory and OOMs / runs for seconds at N≈5000, e.g. a 10 s @ 500 Hz lead).
+        A = (eye(N, format='csc')
+             + (self.smoothing_factor ** 2) * (D.T @ D)).tocsc()
+        lu = splu(A)
+        yT = np.ascontiguousarray(signal.T)   # (N, num_leads)
+        smoothed = lu.solve(yT)               # (N, num_leads), one solve per lead
+        detrended_signal = (yT - smoothed).T  # (num_leads, N)
 
         return ECGInput(detrended_signal, metadata)

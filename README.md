@@ -8,7 +8,7 @@ Here is an example of defining an input schema and transforms,
 ```
 from ecg_transform.inp import ECGInputSchema
 from ecg_transform.t.common import LinearResample, ReorderLeads
-from ecg_transform.t.normalize import MinMaxNormalize
+from ecg_transform.t.scale import MinMaxNormalize
 from ecg_transform.t.cut import Pad, SegmentNonoverlapping
 
 LEAD_ORDER = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']

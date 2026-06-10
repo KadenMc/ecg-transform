@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecg-transform"
-version = "0.1.3"
+version = "0.1.4"
 authors = [
   { name="Kaden McKeen", email="kaden.mckeen@mail.utoronto.ca" },
 ]
 description = "Package curating cohesive training & inference pipelines for ECG analysis."
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -23,6 +23,12 @@ dependencies = [
 ]
 keywords = ["ecg", "ekg", "electrocardiogram", "transform", "transformation", "transformations", "augment", "augmentation", "augmentations"]
 
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
 [project.urls]
 "Homepage" = "https://github.com/KadenMc/ecg-transform"
 "Bug Tracker" = "https://github.com/KadenMc/ecg-transform/issues"
+
+[tool.setuptools.packages.find]
+include = ["ecg_transform*"]

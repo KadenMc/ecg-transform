@@ -29,36 +29,52 @@ class ReorderLeads(ECGTransform):
         signal = inp.signal
         metadata = deepcopy(inp.meta)
 
-        current_leads = metadata.lead_names
-        if set(current_leads) == set(self.expected_order) and list(current_leads) == self.expected_order:
+        current_leads = list(metadata.lead_names)
+        # Already in the requested order — no-op.
+        if current_leads == self.expected_order:
             return inp
 
-        if not self.missing_lead_strategy == 'raise' and \
-            not set(current_leads).issuperset(self.expected_order):
-            missing = set(self.expected_order) - set(current_leads)
+        missing = set(self.expected_order) - set(current_leads)
+        if missing and self.missing_lead_strategy == 'raise':
             raise ValueError(
-                f"Missing leads: {missing}. Can change `missing_lead_strategy` in ReorderLeads transform."
+                f"Missing leads: {missing}. Set `missing_lead_strategy` to 'zero' or "
+                "'constant' in ReorderLeads to fill them instead of raising."
             )
 
+        # Fill value for any expected lead absent from the input. Under 'raise'
+        # there are no missing leads at this point, so `fill` is never used.
+        if self.missing_lead_strategy == 'constant':
+            fill = self.missing_leads_constant
+        else:  # 'zero' or 'raise' (pure reorder)
+            fill = 0
+
+        # Preserve the input dtype — do NOT hardcode float64. Upcasting an int16
+        # or float32 input silently breaks downstream byte-for-byte expectations
+        # (e.g. an FFT resample applied to float64 vs float32 input differs).
         lead_to_idx = {lead: idx for idx, lead in enumerate(current_leads)}
-        if self.missing_lead_strategy == 'raise':
-            new_signal = np.empty((len(self.expected_order), signal.shape[1]), dtype='float64')
-        else:
-            new_signal = np.full(
-                (len(self.expected_order), signal.shape[1]),
-                0 if self.missing_lead_strategy == 'zero' else self.missing_leads_to_value,
-                dtype='float64',
-            )
-
+        new_signal = np.full(
+            (len(self.expected_order), signal.shape[1]), fill, dtype=signal.dtype,
+        )
         for idx, lead in enumerate(self.expected_order):
             if lead in lead_to_idx:
                 new_signal[idx] = signal[lead_to_idx[lead]]
 
-        metadata.lead_names = self.expected_order
+        metadata.lead_names = list(self.expected_order)
 
         return ECGInput(new_signal, metadata)
 
 class LinearResample(ECGTransform):
+    """Resample to ``desired_sample_rate`` via linear interpolation, preserving
+    wall-clock duration (output length scales by the rate ratio).
+
+    ``input_start``/``input_end`` are expressed in samples at the signal's
+    *current* sample rate, so they are rescaled by the same rate ratio. For a
+    fixed-length / fixed-grid resample (e.g. model input pinned to N samples),
+    use :class:`~ecg_transform.t.unit.FourierResampleToLength` instead — linear
+    interpolation lacks anti-aliasing and diverges from an FFT resample at sharp
+    QRS peaks.
+    """
+
     def __init__(self, desired_sample_rate: float):
         self.desired_sample_rate = desired_sample_rate
 
@@ -93,7 +109,8 @@ class MissingLeadToConstant(ECGTransform):
         self.value = value
 
     def _transform(self, inp: ECGInput) -> ECGInput:
-        signal = inp.signal
+        # Copy before writing — never mutate the caller's array in place.
+        signal = inp.signal.copy()
         metadata = deepcopy(inp.meta)
         lead_to_idx = {lead: idx for idx, lead in enumerate(metadata.lead_names)}
         for lead in self.leads_to_set:
@@ -131,11 +148,14 @@ class HandleConstantLeads(ECGTransform):
         if self.strategy == 'ignore':
             return inp
 
-        signal = inp.signal
+        # Copy before writing — never mutate the caller's array in place.
+        signal = inp.signal.copy()
         meta = deepcopy(inp.meta)
 
-        # Create boolean mask of whether a specific lead is constant (all same values)
-        constant = (np.std(signal, axis=1) == 0).squeeze()
+        # Boolean mask, shape (n_leads,), of leads that are constant across time.
+        # No `.squeeze()`: for a single-lead [1, N] signal it would collapse to a
+        # 0-d array and break the boolean row-indexing below.
+        constant = np.std(signal, axis=1) == 0
 
         if not np.any(constant):
             # If no constant leads, nothing to be done
@@ -144,7 +164,7 @@ class HandleConstantLeads(ECGTransform):
         if self.strategy == 'zero':
             # Convert constant leads to zero
             signal[constant, :] = 0
-        elif self.strategy == 'keep':
+        elif self.strategy == 'nan':
             # Convert constant leads to NaN
             signal[constant, :] = np.nan
 
