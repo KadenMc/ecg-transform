@@ -33,6 +33,30 @@ TRANSFORMS = [
 ]
 ```
 
+## Unit conversion & fixed-length resampling
+
+For models with amplitude-sensitive front-ends (e.g. frozen BatchNorm
+calibrated in mV), use `ConvertUnit` to bring a signal to physical mV based on
+the unit declared on `ECGMetadata.unit`, and `FourierResampleToLength` to pin a
+fixed sample grid via `scipy.signal.resample` (FFT):
+
+```
+from ecg_transform.t.unit import ConvertUnit, FourierResampleToLength
+
+TRANSFORMS = [
+    ConvertUnit('mV'),                              # 'adc'/'counts' -> mV; 'mV' is a no-op
+    ReorderLeads(LEAD_ORDER, 'raise'),
+    FourierResampleToLength(1000, sample_rate=100), # length-normalize to a fixed grid
+]
+```
+
+`ConvertUnit` raises if the declared unit is unknown (incl. `None`) — callers
+must declare the source unit, which makes "ADC counts silently treated as mV"
+(or vice versa) impossible. `FourierResampleToLength` preserves the input dtype
+and is a no-op when the signal is already the target length. Prefer it over
+`LinearResample` when output must match an FFT-based pipeline — linear
+interpolation lacks anti-aliasing and diverges at sharp QRS peaks.
+
 Here is an example of how `ecg-transform` could be used in PyTorch (which we do not require to minimize dependencies),
 ```
 from typing import List
