@@ -7,7 +7,7 @@ import numpy as np
 class ECGInputSchema:
     """Defines the preprocessing requirements for a specific model."""
     sample_rate: float  # Desired sampling rate in Hz
-    expected_lead_order: Optional[List[str]] = None  # Expected order required_num_samplesof leads, if any
+    expected_lead_order: Optional[List[str]] = None  # Expected order of leads, if any
     partial_leads: bool = False  # Whether missing leads are allowed
     missing_leads_to_value: Optional[Any] = None  # Value to fill missing leads, if allowed
     allow_nan_samples: bool = False  # Whether NaN values are allowed in the signal
@@ -36,4 +36,18 @@ class ECGInput:
     meta: ECGMetadata
 
     def __post_init__(self):
-        assert len(self.meta.lead_names) == self.signal.shape[0]
+        if self.signal.ndim != 2:
+            raise ValueError(
+                f"ECG signal must be 2-D [n_leads, n_samples], got ndim={self.signal.ndim} "
+                f"(shape={self.signal.shape})."
+            )
+        if len(self.meta.lead_names) != self.signal.shape[0]:
+            raise ValueError(
+                f"lead_names length ({len(self.meta.lead_names)}) does not match the "
+                f"number of signal leads ({self.signal.shape[0]})."
+            )
+        if self.meta.num_samples != self.signal.shape[1]:
+            raise ValueError(
+                f"meta.num_samples ({self.meta.num_samples}) does not match the signal "
+                f"sample count ({self.signal.shape[1]})."
+            )

@@ -4,9 +4,6 @@ from copy import deepcopy
 
 import numpy as np
 
-from scipy.interpolate import interp1d  # LinearResample
-from scipy.signal import butter, filtfilt  # LowpassFilter
-
 from ecg_transform.inp import ECGInput
 
 class ECGTransform(ABC):

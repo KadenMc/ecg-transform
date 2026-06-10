@@ -101,7 +101,20 @@ class Crop(ECGTransform):
         return ECGInput(new_signal, metadata)
 
 class SegmentNonoverlapping(ECGTransform):
+    """Split a signal into consecutive non-overlapping segments of
+    ``segment_length`` samples.
+
+    The trailing remainder (``num_samples % segment_length`` samples) is
+    intentionally dropped. ``input_start``/``input_end`` are expressed relative
+    to the original recording, so each segment's offset is added to the parent's
+    ``input_start`` (consistent with :class:`Crop`).
+    """
+
     def __init__(self, segment_length: int):
+        if not isinstance(segment_length, int) or segment_length <= 0:
+            raise ValueError(
+                f"segment_length must be a positive int, got {segment_length!r}"
+            )
         self.segment_length = segment_length
 
     def _transform(self, inp: ECGInput) -> List[ECGInput]:
@@ -109,6 +122,7 @@ class SegmentNonoverlapping(ECGTransform):
         metadata = deepcopy(inp.meta)
         num_samples = signal.shape[1]
         num_segments = num_samples // self.segment_length
+        parent_start = metadata.input_start
         segments = []
         for i in range(num_segments):
             start = i * self.segment_length
@@ -116,8 +130,8 @@ class SegmentNonoverlapping(ECGTransform):
             segment_signal = signal[:, start:end]
             segment_metadata = deepcopy(metadata)
             segment_metadata.num_samples = self.segment_length
-            segment_metadata.input_start = start
-            segment_metadata.input_end = end
+            segment_metadata.input_start = parent_start + start
+            segment_metadata.input_end = parent_start + end
 
             segments.append(ECGInput(segment_signal, segment_metadata))
 
@@ -149,6 +163,7 @@ class SegmentOnBoundaries(ECGTransform):
         signal = inp.signal  # Shape: (num_leads, num_samples)
         metadata = deepcopy(inp.meta)
         num_samples = signal.shape[1]
+        parent_start = metadata.input_start
         segments = []
         for boundary in boundaries:
             # Define segment start and end, ensuring they stay within signal bounds
@@ -160,8 +175,9 @@ class SegmentOnBoundaries(ECGTransform):
                 segment_signal = signal[:, start:end]
                 segment_metadata = deepcopy(metadata)
                 segment_metadata.num_samples = end - start
-                segment_metadata.input_start = start
-                segment_metadata.input_end = end
+                # input_start/end are relative to the original recording.
+                segment_metadata.input_start = parent_start + start
+                segment_metadata.input_end = parent_start + end
                 segments.append(ECGInput(segment_signal, segment_metadata))
 
         return segments
