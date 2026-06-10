@@ -18,6 +18,7 @@ def make_input(
     lead_names: Optional[List[str]] = None,
     unit: str = 'mV',
     input_start: int = 0,
+    adc_microvolts_per_count: Optional[float] = None,
 ) -> ECGInput:
     """Build an ECGInput with a consistent ECGMetadata from a [n_leads, N] array."""
     signal = np.asarray(signal)
@@ -29,6 +30,7 @@ def make_input(
         unit=unit,
         input_start=input_start,
         input_end=input_start + signal.shape[1],
+        adc_microvolts_per_count=adc_microvolts_per_count,
     )
     return ECGInput(signal, meta)
 

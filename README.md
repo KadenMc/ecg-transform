@@ -52,10 +52,28 @@ TRANSFORMS = [
 
 `ConvertUnit` raises if the declared unit is unknown (incl. `None`) — callers
 must declare the source unit, which makes "ADC counts silently treated as mV"
-(or vice versa) impossible. `FourierResampleToLength` preserves the input dtype
-and is a no-op when the signal is already the target length. Prefer it over
-`LinearResample` when output must match an FFT-based pipeline — linear
-interpolation lacks anti-aliasing and diverges at sharp QRS peaks.
+(or vice versa) impossible.
+
+The ADC gain belongs to the *data*, not to the transform, so there is no
+device-specific default. When converting ADC counts → mV, supply the gain
+(µV/count) one of two ways:
+
+```
+# (a) per-record (real, sample-specific) gain on the metadata:
+meta = ECGMetadata(..., unit='adc', adc_microvolts_per_count=4.88)
+transforms = [ConvertUnit('mV')]                       # reads it off each record
+
+# (b) one corpus-wide constant (mock / no per-record metadata):
+transforms = [ConvertUnit('mV', adc_microvolts_per_count=4.88)]  # applies to all
+```
+
+A constant passed to `ConvertUnit` takes precedence over per-record metadata;
+ADC input with neither raises.
+
+`FourierResampleToLength` preserves the input dtype and is a no-op when the
+signal is already the target length. Prefer it over `LinearResample` when output
+must match an FFT-based pipeline — linear interpolation lacks anti-aliasing and
+diverges at sharp QRS peaks.
 
 Here is an example of how `ecg-transform` could be used in PyTorch (which we do not require to minimize dependencies),
 ```

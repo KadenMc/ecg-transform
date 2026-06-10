@@ -18,7 +18,8 @@ def test_convert_unit_mv_is_noop():
     assert out.meta.unit == 'mV'
 
 
-def test_convert_unit_adc_to_mv():
+def test_convert_unit_adc_to_mv_corpus_constant():
+    # Corpus-wide constant passed to the transform.
     sig = np.full((12, 8), 1000.0, dtype=np.float32)  # ADC counts
     out = ConvertUnit('mV', adc_microvolts_per_count=4.88)(
         [make_input(sig, unit='adc')]
@@ -27,9 +28,35 @@ def test_convert_unit_adc_to_mv():
     assert out.meta.unit == 'mV'
 
 
+def test_convert_unit_adc_gain_from_metadata():
+    # Per-record gain on ECGMetadata, no constant on the transform.
+    sig = np.full((12, 8), 1000.0, dtype=np.float32)
+    out = ConvertUnit('mV')(
+        [make_input(sig, unit='adc', adc_microvolts_per_count=4.88)]
+    )[0]
+    np.testing.assert_allclose(out.signal, 1000.0 * (4.88 / 1000.0))
+    assert out.meta.unit == 'mV'
+
+
+def test_convert_unit_constant_overrides_metadata():
+    sig = np.full((12, 8), 1000.0, dtype=np.float32)
+    out = ConvertUnit('mV', adc_microvolts_per_count=4.88)(
+        [make_input(sig, unit='adc', adc_microvolts_per_count=1.0)]
+    )[0]
+    np.testing.assert_allclose(out.signal, 1000.0 * (4.88 / 1000.0))  # 4.88, not 1.0
+
+
+def test_convert_unit_adc_requires_gain():
+    # ADC counts with neither a constant nor per-record metadata gain -> raise.
+    with pytest.raises(ValueError, match="gain"):
+        ConvertUnit('mV')([make_input(sine_12lead(8), unit='adc')])
+
+
 def test_convert_unit_adc_preserves_float32():
     sig = sine_12lead(8, dtype=np.float32)
-    out = ConvertUnit('mV')([make_input(sig, unit='adc')])[0]
+    out = ConvertUnit('mV', adc_microvolts_per_count=4.88)(
+        [make_input(sig, unit='adc')]
+    )[0]
     assert out.signal.dtype == np.float32
 
 
