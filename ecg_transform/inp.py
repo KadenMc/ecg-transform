@@ -24,6 +24,12 @@ class ECGMetadata:
     unit: str
     input_start: int # Sample # of the start of the input relative to the original sample
     input_end: int # Sample # of the end of the input relative to the original sample
+    # ADC gain in microvolts per count, for ADC→mV conversion (see
+    # ecg_transform.t.unit.ConvertUnit). Optional and per-record: leave None for
+    # signals already in physical units, or when a single corpus-wide constant is
+    # supplied to ConvertUnit instead. This is the right home for real,
+    # sample-specific gains (e.g. read from a WFDB header).
+    adc_microvolts_per_count: Optional[float] = None
 
     @property
     def length_sec(self) -> float:
