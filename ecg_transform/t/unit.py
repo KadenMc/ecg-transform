@@ -51,11 +51,22 @@ class ConvertUnit(ECGTransform):
     - ``'mV'``                  -> no-op (returns the input unchanged)
     - ``'adc'`` / ``'counts'``  -> multiply by ``gain / 1000``, set
       ``meta.unit = 'mV'`` (gain = constant if given, else per-record metadata)
+    - microvolts: ``'uV'``, ``'\u00b5V'`` (micro sign, U+00B5), ``'\u03bcV'`` (Greek mu,
+      U+03BC), ``'microvolt'``, ``'microvolts'`` -> divide by 1000, set ``meta.unit = 'mV'``
+    - volts: ``'V'``, ``'volt'``, ``'volts'`` -> multiply by 1000, set ``meta.unit = 'mV'``
     - anything else (incl. ``None``) -> raise ``ValueError``
+
+    Microvolts and volts are fixed physical units, so they need no gain; a gain given for one
+    is ignored. Dividing by 1000 (rather than multiplying by 0.001, which is not exact in
+    binary) rounds once. As for counts, a float32 signal stays float32.
     """
 
     _MV_ALIASES = frozenset({'mv'})
     _ADC_ALIASES = frozenset({'adc', 'counts'})
+    # Microvolts and volts, matched after lower(): 'uV' and 'UV' both give 'uv'; the micro sign
+    # (U+00B5) and the Greek small mu (U+03BC) are both spellings of the prefix and both accepted.
+    _UV_ALIASES = frozenset({'uv', '\u00b5v', '\u03bcv', 'microvolt', 'microvolts'})
+    _V_ALIASES = frozenset({'v', 'volt', 'volts'})
 
     def __init__(self, target: str = 'mV',
                  adc_microvolts_per_count: Optional[float] = None):
@@ -85,10 +96,22 @@ class ConvertUnit(ECGTransform):
             signal = inp.signal * (gain / 1000.0)
             meta.unit = 'mV'
             return ECGInput(signal, meta)
+        if unit in self._UV_ALIASES:
+            return self._in_millivolts(inp, inp.signal / 1000.0)
+        if unit in self._V_ALIASES:
+            return self._in_millivolts(inp, inp.signal * 1000.0)
         raise ValueError(
             f"ConvertUnit cannot convert from unit {inp.meta.unit!r}; expected one "
-            "of 'mV', 'adc', 'counts'. Declare the source unit on ECGMetadata.unit."
+            "of 'mV', 'adc', 'counts', 'uV' (or 'microvolts'), 'V' (or 'volts'). "
+            "Declare the source unit on ECGMetadata.unit."
         )
+
+    @staticmethod
+    def _in_millivolts(inp: ECGInput, signal: np.ndarray) -> ECGInput:
+        """``inp`` with ``signal`` in its place, declared as millivolts."""
+        meta = deepcopy(inp.meta)
+        meta.unit = 'mV'
+        return ECGInput(signal, meta)
 
 
 class FourierResampleToLength(ECGTransform):
