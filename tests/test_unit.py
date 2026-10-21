@@ -71,6 +71,63 @@ def test_convert_unit_rejects_non_mv_target():
         ConvertUnit('uV')
 
 
+# The micro sign (U+00B5) and the Greek small mu (U+03BC): both spell the prefix.
+MICRO_SIGN, GREEK_MU = chr(0x00B5), chr(0x03BC)
+
+
+@pytest.mark.parametrize(
+    'unit',
+    ['uV', 'UV', MICRO_SIGN + 'V', GREEK_MU + 'V', 'microvolt', 'microvolts', 'Microvolts'],
+)
+def test_convert_unit_microvolts_to_mv(unit):
+    sig = np.full((12, 8), 1500.0, dtype=np.float32)  # microvolts
+    out = ConvertUnit('mV')([make_input(sig, unit=unit)])[0]
+    np.testing.assert_allclose(out.signal, 1.5)
+    assert out.meta.unit == 'mV'
+    assert out.signal.dtype == np.float32
+
+
+@pytest.mark.parametrize('unit', ['V', 'v', 'volt', 'volts', 'Volts'])
+def test_convert_unit_volts_to_mv(unit):
+    sig = np.full((12, 8), 0.0015, dtype=np.float32)  # volts
+    out = ConvertUnit('mV')([make_input(sig, unit=unit)])[0]
+    np.testing.assert_allclose(out.signal, 1.5, rtol=1e-6)
+    assert out.meta.unit == 'mV'
+    assert out.signal.dtype == np.float32
+
+
+def test_convert_unit_microvolts_divide_with_one_rounding():
+    # Dividing by 1000 rounds once, so values a float32 can hold in mV come out exact.
+    sig = np.array([[1500.0, -250.0, 0.0, 125.0]], dtype=np.float32)
+    out = ConvertUnit('mV')([make_input(sig, unit='uV')])[0]
+    assert np.array_equal(out.signal, np.array([[1.5, -0.25, 0.0, 0.125]], dtype=np.float32))
+
+
+def test_convert_unit_physical_units_ignore_a_gain():
+    # A gain belongs to counts; microvolts and volts are fixed units and need none.
+    sig = np.full((12, 8), 1000.0, dtype=np.float32)
+    out = ConvertUnit('mV', adc_microvolts_per_count=4.88)(
+        [make_input(sig, unit='uV', adc_microvolts_per_count=4.88)]
+    )[0]
+    np.testing.assert_allclose(out.signal, 1.0)
+
+
+def test_convert_unit_physical_units_keep_the_rest_and_leave_the_input_alone():
+    inp = make_input(sine_12lead(10), unit='uV', sample_rate=250, input_start=3)
+    out = ConvertUnit('mV')([inp])[0]
+    assert out is not inp
+    assert (out.meta.sample_rate, out.meta.num_samples, out.meta.input_start, out.meta.input_end) == (250, 10, 3, 13)
+    assert out.meta.lead_names == inp.meta.lead_names
+    assert inp.meta.unit == 'uV'
+    np.testing.assert_allclose(out.signal, inp.signal / 1000.0)
+
+
+def test_convert_unit_still_refuses_other_units():
+    for bad in ('mmV', 'nV', 'kV', 'uV/count', 'degreeC'):
+        with pytest.raises(ValueError, match="'uV'"):
+            ConvertUnit('mV')([make_input(sine_12lead(8), unit=bad)])
+
+
 # --- FourierResampleToLength ------------------------------------------------
 
 def test_fourier_resample_changes_length():

@@ -54,6 +54,11 @@ TRANSFORMS = [
 must declare the source unit, which makes "ADC counts silently treated as mV"
 (or vice versa) impossible.
 
+Microvolts (`'uV'`, `'µV'` with either the micro sign or the Greek mu,
+`'microvolt'`, `'microvolts'`) and volts (`'V'`, `'volt'`, `'volts'`) are fixed
+physical units: they convert without a gain, dividing by 1000 and multiplying by
+1000 respectively (since 0.2.1). Units are matched case-insensitively.
+
 The ADC gain belongs to the *data*, not to the transform, so there is no
 device-specific default. When converting ADC counts → mV, supply the gain
 (µV/count) one of two ways:
